@@ -1,24 +1,21 @@
-# Build All Services Script
-Write-Host "=== Building Intelligent Investor Desk ===" -ForegroundColor Green
+Write-Host "=========================================" -ForegroundColor Green
+Write-Host "  Building All Services" -ForegroundColor Green
+Write-Host "=========================================" -ForegroundColor Green
 
-function Build-Service {
-    param($serviceName)
-    
-    Write-Host "Building $serviceName..." -ForegroundColor Yellow
-    Set-Location "..\..\backend\$serviceName"
+$services = @("eureka-server", "config-server")
+
+foreach ($service in $services) {
+    Write-Host "Building $service..." -ForegroundColor Yellow
+    Set-Location "..\..\backend\$service"
     
     mvn clean package -DskipTests
     
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✓ $serviceName built successfully" -ForegroundColor Green
+        Write-Host "Success: $service built" -ForegroundColor Green
     } else {
-        Write-Host "✗ $serviceName build failed" -ForegroundColor Red
+        Write-Host "Failed: $service" -ForegroundColor Red
         exit 1
     }
 }
 
-# Build services
-Build-Service "eureka-server"
-Build-Service "config-server"
-
-Write-Host "=== All services built successfully! ===" -ForegroundColor Green
+Write-Host "All services built successfully!" -ForegroundColor Green
