@@ -1,36 +1,28 @@
-# Health Check Script
-Write-Host "=== Service Health Check ===" -ForegroundColor Yellow
-Write-Host ""
-
-Write-Host "Docker Containers:" -ForegroundColor Yellow
-Set-Location "..\docker"
-docker-compose ps
-
-Write-Host ""
-Write-Host "Service Endpoints:" -ForegroundColor Yellow
-
-# Function to check service.
-function Test-Service {
-    param($name, $url)
-    
+function Test-Service($name, $url) {
     try {
-        $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 5
+        $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
         if ($response.StatusCode -eq 200) {
-            Write-Host "$name : ✓ UP - $url" -ForegroundColor Green
-        } else {
-            Write-Host "$name : ✗ DOWN" -ForegroundColor Red
+            Write-Host "$name : UP" -ForegroundColor Green
+            return $true
         }
     } catch {
-        Write-Host "$name : ✗ DOWN" -ForegroundColor Red
+        Write-Host "$name : DOWN" -ForegroundColor Red
+        return $false
     }
 }
 
-# Check services
-Test-Service "Eureka Server   " "http://localhost:8761"
-Test-Service "Config Server   " "http://localhost:8888/actuator/health"
-Test-Service "RabbitMQ        " "http://localhost:15672"
-Test-Service "Prometheus      " "http://localhost:9090"
-Test-Service "Grafana         " "http://localhost:3000"
-Test-Service "Jaeger          " "http://localhost:16686"
+Write-Host "Health Check" -ForegroundColor Cyan
 
-Write-Host ""
+$allHealthy = $true
+$allHealthy = $allHealthy -and (Test-Service "Eureka" "http://localhost:8761/actuator/health")
+$allHealthy = $allHealthy -and (Test-Service "Config" "http://localhost:8888/actuator/health")
+$allHealthy = $allHealthy -and (Test-Service "Prometheus" "http://localhost:9090/-/healthy")
+$allHealthy = $allHealthy -and (Test-Service "Grafana" "http://localhost:3000/api/health")
+
+if ($allHealthy) {
+    Write-Host "All services healthy!" -ForegroundColor Green
+    exit 0
+} else {
+    Write-Host "Some services down" -ForegroundColor Red
+    exit 1
+}
