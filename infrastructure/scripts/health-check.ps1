@@ -9,7 +9,7 @@ docker-compose ps
 Write-Host ""
 Write-Host "Service Endpoints:" -ForegroundColor Yellow
 
-# Function to check service
+# Function to check service.
 function Test-Service {
     param($name, $url)
     
