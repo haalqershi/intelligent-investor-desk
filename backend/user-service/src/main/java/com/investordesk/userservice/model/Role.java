@@ -1,0 +1,36 @@
+package com.investordesk.userservice.model;
+
+import com.investordesk.userservice.model.enums.RoleName;
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.util.HashSet;
+import java.util.Set;
+
+/**
+ * Role entity for RBAC
+ */
+@Entity
+@Table(name = "roles")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Role extends BaseEntity {
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "name", nullable = false, unique = true)
+    private RoleName name;
+
+    @Column(name = "description")
+    private String description;
+
+    @ManyToMany(mappedBy = "roles", fetch = FetchType.LAZY)
+    @Builder.Default
+    private Set<User> users = new HashSet<>();
+
+    public Role(RoleName name) {
+        this.name = name;
+    }
+}
