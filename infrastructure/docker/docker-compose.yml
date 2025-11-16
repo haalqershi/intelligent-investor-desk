@@ -1,12 +1,9 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: investordesk-postgres
     environment:
-      # Use variables from .env file
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
@@ -18,10 +15,11 @@ services:
     networks:
       - investordesk-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} && psql -U ${POSTGRES_USER} -lqt | cut -d \\| -f 1 | grep -qw user_db"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
   # Redis Cache
   redis:
@@ -39,27 +37,28 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+      start_period: 10s
 
   # RabbitMQ Message Broker
   rabbitmq:
     image: rabbitmq:3.12-management-alpine
     container_name: investordesk-rabbitmq
     environment:
-      # Use variables from .env file
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
     ports:
-      - "5672:5672"    # AMQP port
-      - "15672:15672"  # Management UI
+      - "5672:5672"
+      - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - investordesk-network
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
       interval: 30s
       timeout: 10s
       retries: 5
+      start_period: 60s
 
   # Eureka Server
   eureka-server:
@@ -72,11 +71,11 @@ services:
     networks:
       - investordesk-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8761/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 40s
+      start_period: 60s
 
   # Config Server
   config-server:
@@ -87,21 +86,59 @@ services:
     ports:
       - "8888:8888"
     environment:
+      SPRING_PROFILES_ACTIVE: native
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
-      SPRING_CLOUD_CONFIG_SERVER_GIT_URI: file:///config-repo
     volumes:
-      - ../../config-repo:/config-repo
+      - ../../config-repo:/config-repo:ro
     networks:
       - investordesk-network
     depends_on:
       eureka-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8888/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 40s
+      start_period: 60s
+
+  # User Service - WAITS FOR ALL DEPENDENCIES
+  user-service:
+    build:
+      context: ../../backend/user-service
+      dockerfile: Dockerfile
+    image: investordesk/user-service:1.0.0
+    container_name: investordesk-user-service
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/user_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS}
+      REFRESH_TOKEN_EXPIRATION_MS: ${REFRESH_TOKEN_EXPIRATION_MS}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    ports:
+      - "8081:8081"
+    networks:
+      - investordesk-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+      eureka-server:
+        condition: service_healthy
+        restart: true
+      redis:
+        condition: service_healthy
+        restart: true
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
 
   # Prometheus
   prometheus:
@@ -117,6 +154,8 @@ services:
       - '--storage.tsdb.path=/prometheus'
     networks:
       - investordesk-network
+    depends_on:
+      - user-service
 
   # Grafana
   grafana:
@@ -125,7 +164,6 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # Use variables from .env file
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASS}
     volumes:
@@ -141,8 +179,8 @@ services:
     image: jaegertracing/all-in-one:latest
     container_name: investordesk-jaeger
     ports:
-      - "16686:16686"  # UI
-      - "6831:6831/udp"  # Agent
+      - "16686:16686"
+      - "6831:6831/udp"
     environment:
       COLLECTOR_ZIPKIN_HOST_PORT: :9411
     networks:
