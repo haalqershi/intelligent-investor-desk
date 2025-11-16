@@ -5,3 +5,4 @@ Set-Location "..\docker"
 docker-compose down
 
 Write-Host "Services stopped." -ForegroundColor Red
+Set-Location "..\..\infrastructure\scripts"

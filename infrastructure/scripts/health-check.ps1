@@ -18,6 +18,7 @@ $allHealthy = $allHealthy -and (Test-Service "Eureka" "http://localhost:8761/act
 $allHealthy = $allHealthy -and (Test-Service "Config" "http://localhost:8888/actuator/health")
 $allHealthy = $allHealthy -and (Test-Service "Prometheus" "http://localhost:9090/-/healthy")
 $allHealthy = $allHealthy -and (Test-Service "Grafana" "http://localhost:3000/api/health")
+$allHealthy = $allHealthy -and (Test-Service "User Service"  "http://localhost:8081/actuator/health")
 
 if ($allHealthy) {
     Write-Host "All services healthy!" -ForegroundColor Green

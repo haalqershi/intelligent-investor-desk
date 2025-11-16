@@ -7,9 +7,6 @@ import lombok.*;
 import java.util.HashSet;
 import java.util.Set;
 
-/**
- * Role entity for RBAC
- */
 @Entity
 @Table(name = "roles")
 @Getter

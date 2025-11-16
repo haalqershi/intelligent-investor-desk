@@ -13,9 +13,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * User entity implementing UserDetails for Spring Security
- */
 @Entity
 @Table(name = "users")
 @Getter
@@ -92,6 +89,16 @@ public class User extends BaseEntity implements UserDetails {
         return roles.stream()
                 .map(role -> new SimpleGrantedAuthority(role.getName().name()))
                 .collect(Collectors.toSet());
+    }
+
+    @Override
+    public String getUsername() {
+        return username;
+    }
+
+    @Override
+    public String getPassword() {
+        return password;
     }
 
     @Override
